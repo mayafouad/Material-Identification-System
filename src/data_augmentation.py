@@ -29,7 +29,7 @@ class DataAugmentor:
                 p=0.6
             ),  # Simulate lighting variations
             A.GaussNoise(
-                std_range=(0.05, 0.2),  # (≈13 to 50)
+                std_range=(0.05, 0.2),  # 5-20% noise (≈13 to 51 for 8-bit images)
                 mean_range=(0.0, 0.0),
                 per_channel=True,
                 p=0.3
