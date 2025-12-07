@@ -30,7 +30,8 @@ def load_image(image_path, color_mode='rgb'):
     img = cv2.imread(str(image_path))
 
     if img is None:
-        raise ValueError(f"Could not load image: {image_path}")
+        print(f"[WARN] Skipping corrupted image: {image_path}")
+        return None
 
     if color_mode == 'rgb':
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
