@@ -11,7 +11,8 @@ class FeatureExtractor:
                  lbp_radius=1,
                  hog_orientations=9,
                  hog_pixels_per_cell=(8, 8),
-                 hog_cells_per_block=(2, 2)):
+                 hog_cells_per_block=(2, 2),
+                 target_size=(256, 256)):
 
         self.hist_bins = hist_bins
         self.hist_ranges = hist_ranges
@@ -20,11 +21,40 @@ class FeatureExtractor:
         self.hog_orientations = hog_orientations
         self.hog_pixels_per_cell = hog_pixels_per_cell
         self.hog_cells_per_block = hog_cells_per_block
+        self.target_size = target_size
 
     def remove_background(self, image):
-        image = remove(image)
+        image = remove(image)  
         foreground = cv2.cvtColor(np.array(image), cv2.COLOR_RGBA2BGR)
         return foreground
+
+    def crop_to_foreground(self, image):
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        coords = cv2.findNonZero(gray)   
+        x, y, w, h = cv2.boundingRect(coords)
+        cropped = image[y:y+h, x:x+w]
+        return cropped
+
+    def resize_with_aspect_ratio(self, image):
+        target_w, target_h = self.target_size
+        h, w = image.shape[:2]
+        scale = min(target_w / w, target_h / h)
+        new_w, new_h = int(w * scale), int(h * scale)
+        resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+
+        top = (target_h - new_h) // 2
+        bottom = target_h - new_h - top
+        left = (target_w - new_w) // 2
+        right = target_w - new_w - left
+        padded = cv2.copyMakeBorder(resized, top, bottom, left, right,
+                                    cv2.BORDER_CONSTANT, value=(0,0,0))
+        return padded
+
+    def preprocess(self, image):
+        fg = self.remove_background(image)
+        cropped = self.crop_to_foreground(fg)
+        resized = self.resize_with_aspect_ratio(cropped)
+        return resized
 
     def extract_color_histogram(self, image):
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -51,9 +81,9 @@ class FeatureExtractor:
         return hog_features
 
     def extract_features(self, image):
-        foreground = self.remove_background(image)
-        color_features = self.extract_color_histogram(foreground)
-        texture_features = self.extract_lbp(image)
-        hog_features = self.extract_hog(image)
+        processed = self.preprocess(image)
+        color_features = self.extract_color_histogram(processed)
+        texture_features = self.extract_lbp(processed)
+        hog_features = self.extract_hog(processed)
         final_features = np.hstack([color_features, texture_features, hog_features])
         return final_features
