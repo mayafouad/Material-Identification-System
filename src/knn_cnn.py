@@ -1,5 +1,6 @@
 import joblib
 import numpy as np
+import pickle
 from pathlib import Path
 from sklearn.neighbors import KNeighborsClassifier
 from tqdm import tqdm
@@ -18,7 +19,7 @@ from utils import CLASSES
 # 🔥 FIXED DATASET DIRECTORY
 # ---------------------------
 # This points to: Material-Identification-System/augmented_dataset
-DATASET_DIR = Path(__file__).resolve().parents[1] / "augmented_dataset"
+DATASET_DIR = Path(__file__).resolve().parents[1] / "dataset"
 MODEL_PATH = Path(__file__).resolve().parents[1] / "models/knn_cnn.pkl"
 SCALER_PATH = Path(__file__).resolve().parents[1] / "models/scaler_knn_cnn.pkl"
 
@@ -101,6 +102,30 @@ def train_knn_cnn(k=5):
     print(f"✔ Scaler saved to: {SCALER_PATH}")
     print("\nTraining complete!")
 
+def preprocess_image(img_path, extractor = CNNFeatureExtractor()):
+    feat = extractor.extract(str(img_path))
+    return feat
+
+def predict_material(image_path):
+    UNKNOWN_THRESHOLD = 0.7
+    knn = joblib.load(MODEL_PATH)
+    scaler = joblib.load(SCALER_PATH)
+
+    features = preprocess_image(str(image_path))
+    features_scaled = scaler.transform([features])
+    
+    probs = knn.predict_proba(features_scaled)[0]
+    best_idx = np.argmax(probs)
+    best_prob = probs[best_idx]
+
+    if best_prob < UNKNOWN_THRESHOLD:
+        return "Unknown", float(1-best_prob)
+
+    return CLASSES[best_idx], float(best_prob)
+
+
 
 if __name__ == "__main__":
-    train_knn_cnn()
+    #train_knn_cnn()
+    pred, prob = predict_material("images.jpg")
+    print(f"Prediction: {pred} (confidence: {prob:.2f})")
