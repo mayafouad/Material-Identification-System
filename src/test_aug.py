@@ -32,7 +32,7 @@ def test_augmentor():
     augmentor = DataAugmentor(
         input_dir=real_dataset_path,
         output_dir=output_path,
-        target_samples=500
+        target_samples=1000
     )
 
     print("\n[TEST] Running augmentation...")

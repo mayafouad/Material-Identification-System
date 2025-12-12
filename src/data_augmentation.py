@@ -10,7 +10,7 @@ from utils import (
 
 
 class DataAugmentor:
-    def __init__(self, input_dir, output_dir, target_samples=500):
+    def __init__(self, input_dir, output_dir, target_samples=1000):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
         self.target_samples = target_samples
@@ -94,7 +94,7 @@ class DataAugmentor:
                     image = load_image(image_path, color_mode='rgb')
                     if image is None:
                         continue
-                    use_light = count > self.target_samples * 0.6
+                    use_light = count > self.target_samples * 0.8
                     augmented_image = self.augment_image(image, light_transform=use_light)
 
                     new_name = f"{image_path.stem}_aug_{i}.jpg"
