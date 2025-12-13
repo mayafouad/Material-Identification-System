@@ -1,24 +1,19 @@
 from pathlib import Path
 import albumentations as A
 import cv2
+from tqdm import tqdm
 
-from utils import (
-    CLASSES,
-    get_class_counts,
-    load_image,
-)
+from utils import CLASSES, load_image
 
 
 class DataAugmentor:
-    def __init__(self, input_dir, output_dir, target_samples=1000):
+    def __init__(self, input_dir, output_dir, increase_percent=40):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
-        self.target_samples = target_samples
-        self.transform = self._generate_heavy_transform()
-        self.light_transform = self._generate_light_transform()
-        self.class_counts = get_class_counts(self.input_dir)
+        self.increase_percent = increase_percent
+        self.transform = self._create_transform()
 
-    def _generate_heavy_transform(self):
+    def _create_transform(self):
         return A.Compose([
             A.HorizontalFlip(p=0.5),  # Mirror horizontally
             A.VerticalFlip(p=0.3),  # Mirror vertically
@@ -51,54 +46,55 @@ class DataAugmentor:
             ),  # Combined shift, scale, rotate (general robustness)
         ])
 
-    def _generate_light_transform(self):
-        return A.Compose([
-            A.HorizontalFlip(p=0.5),  # Mirror horizontally
-            A.Rotate(limit=15, p=0.5),  # Small rotation
-            A.RandomBrightnessContrast(brightness_limit=0.15, contrast_limit=0.15, p=0.5),  # Minor lighting changes
-        ])
-
-    def augment_image(self, image, light_transform=False):
-        transform = self.light_transform if light_transform else self.transform
-        augmented = transform(image=image)
-        return augmented["image"]
+    def augment_image(self, image):
+        return self.transform(image=image)["image"]
 
     def augment_dataset(self):
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+        print(f"\nAugmenting dataset (+{self.increase_percent}% per class)")
+        print("=" * 50)
+
         for class_name in CLASSES:
-            class_input_path = self.input_dir / class_name
-            class_output_path = self.output_dir / class_name
-            class_output_path.mkdir(parents=True, exist_ok=True)
+            class_input = self.input_dir / class_name
+            class_output = self.output_dir / class_name
+            class_output.mkdir(parents=True, exist_ok=True)
 
-            images_paths = list(class_input_path.glob("*.jpg"))
-            count = len(images_paths)
-
-            print(f"Class: {class_name}, count: {count}")
-
-            for image_path in images_paths:
-                image = load_image(image_path, color_mode='rgb')
-                if image is None:
-                    continue
-                cv2.imwrite(str(class_output_path / image_path.name), image)
-
-            if count >= self.target_samples:
+            if not class_input.exists():
+                print(f"[WARN] {class_name}: folder not found, skipping")
                 continue
 
-            i = 0
-            needed = self.target_samples - count
-            while i < needed:
-                for image_path in images_paths:
-                    if i >= needed:
-                        break
-                    image = load_image(image_path, color_mode='rgb')
-                    if image is None:
-                        continue
-                    use_light = count > self.target_samples * 0.8
-                    augmented_image = self.augment_image(image, light_transform=use_light)
+            image_paths = list(class_input.glob("*.jpg")) + list(class_input.glob("*.png"))
+            
+            # copy originals and count valid images
+            valid_count = 0
+            valid_paths = []
+            
+            for img_path in image_paths:
+                img = load_image(img_path, color_mode='rgb')
+                if img is None:
+                    continue
+                valid_count += 1
+                valid_paths.append((img_path, img))
+                cv2.imwrite(str(class_output / img_path.name), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
-                    new_name = f"{image_path.stem}_aug_{i}.jpg"
+            # calculate augmentations needed (40% of valid originals)
+            needed = int(valid_count * self.increase_percent / 100)
+            
+            print(f"{class_name}: {valid_count} valid images → +{needed} augmented")
 
-                    cv2.imwrite(str(class_output_path / new_name), augmented_image)
-                    i += 1
-            print(f"→ Done augmenting {class_name}")
+            if needed == 0:
+                continue
+
+            # generate augmentations
+            aug_count = 0
+            for img_path, img in tqdm(valid_paths * (needed // valid_count + 1), desc=f"  {class_name}", total=needed):
+                if aug_count >= needed:
+                    break
+                aug_img = self.augment_image(img)
+                aug_name = f"{img_path.stem}_aug_{aug_count}.jpg"
+                cv2.imwrite(str(class_output / aug_name), cv2.cvtColor(aug_img, cv2.COLOR_RGB2BGR))
+                aug_count += 1
+
+        print("=" * 50)
+        print("Done!")
