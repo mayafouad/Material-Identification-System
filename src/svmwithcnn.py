@@ -110,5 +110,28 @@ def train_svm_cnn():
     print("\nTraining complete!")
 
 
+def preprocess_image(img_path, extractor=CNNFeatureExtractor()):
+    feat = extractor.extract(str(img_path))
+    return feat
+
+
+def predict_material(image_path):
+    UNKNOWN_THRESHOLD = 0.4
+    svm = joblib.load(MODEL_PATH)
+    scaler = joblib.load(SCALER_PATH)
+
+    features = preprocess_image(str(image_path))
+    features_scaled = scaler.transform([features])
+
+    probs = svm.predict_proba(features_scaled)[0]
+    best_idx = np.argmax(probs)
+    best_prob = probs[best_idx]
+
+    if best_prob < UNKNOWN_THRESHOLD:
+        return "Unknown", float(1-best_prob)
+
+    return CLASSES[best_idx], float(best_prob)
+
+
 if __name__ == "__main__":
     train_svm_cnn()

@@ -107,7 +107,7 @@ def preprocess_image(img_path, extractor = CNNFeatureExtractor()):
     return feat
 
 def predict_material(image_path):
-    UNKNOWN_THRESHOLD = 0.7
+    UNKNOWN_THRESHOLD = 0.4
     knn = joblib.load(MODEL_PATH)
     scaler = joblib.load(SCALER_PATH)
 
