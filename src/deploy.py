@@ -1,14 +1,16 @@
 """
-Material Stream Identification System - Real-Time Deployment
-============================================================
-This module provides a real-time classification application using webcam feed.
-It supports both SVM and KNN models for material classification.
+Material Stream Identification System - Real-Time Deployment (Standalone)
+=========================================================================
+This is a standalone version that can run directly in any Python IDE.
+
+Installation:
+    pip install opencv-python tensorflow numpy joblib scikit-learn
 
 Usage:
     python deploy.py              # Uses SVM model by default
     python deploy.py --model knn  # Uses KNN model
     python deploy.py --model svm  # Uses SVM model
-    
+
 Controls:
     Q or ESC - Quit the application
     S - Switch between SVM and KNN models
@@ -19,11 +21,33 @@ import os
 import sys
 import cv2
 import time
-import joblib
 import argparse
 import numpy as np
 from pathlib import Path
 from datetime import datetime
+
+# Check for required packages
+REQUIRED_PACKAGES = {
+    'cv2': 'opencv-python',
+    'tensorflow': 'tensorflow',
+    'joblib': 'joblib',
+    'sklearn': 'scikit-learn'
+}
+
+missing_packages = []
+for module, package in REQUIRED_PACKAGES.items():
+    try:
+        __import__(module)
+    except ImportError:
+        missing_packages.append(package)
+
+if missing_packages:
+    print("[ERROR] Missing required packages. Please install them using:")
+    print(f"pip install {' '.join(missing_packages)}")
+    sys.exit(1)
+
+# Now import after checking
+import joblib
 
 # TensorFlow GPU configuration
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TF warnings
@@ -31,35 +55,28 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TF warnings
 import tensorflow as tf
 
 # Enable GPU memory growth to avoid OOM issues
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-    try:
+try:
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    if gpus:
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
         print(f"[INFO] GPU detected: {len(gpus)} device(s) available")
-    except RuntimeError as e:
-        print(f"[WARN] GPU config error: {e}")
+    else:
+        print("[INFO] No GPU detected, using CPU")
+except Exception as e:
+    print(f"[WARN] GPU config error: {e}")
 
 from tensorflow.keras.applications.efficientnet import EfficientNetB0, preprocess_input
-from utils import CLASSES, IDX_TO_CLASS
-
 
 # ============================================================================
-# CONFIGURATION
+# CONSTANTS (Embedded to avoid external dependencies)
 # ============================================================================
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-MODELS_DIR = PROJECT_ROOT / "models"
-CAPTURES_DIR = PROJECT_ROOT / "captures"
 
-# Model paths
-SVM_MODEL_PATH = MODELS_DIR / "svm_cnn.pkl"
-SVM_SCALER_PATH = MODELS_DIR / "scaler_cnn.pkl"
-KNN_MODEL_PATH = MODELS_DIR / "knn_cnn.pkl"
-KNN_SCALER_PATH = MODELS_DIR / "scaler_knn_cnn.pkl"
+# Material classes
+CLASSES = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
 
-# Classification thresholds
-SVM_CONFIDENCE_THRESHOLD = 0.4
-KNN_CONFIDENCE_THRESHOLD = 0.4
+# Index to class mapping
+IDX_TO_CLASS = {i: cls for i, cls in enumerate(CLASSES)}
 
 # UI Colors (BGR format for OpenCV)
 COLORS = {
@@ -72,7 +89,7 @@ COLORS = {
     'unknown': (0, 0, 255),      # Red
 }
 
-# Material icons/emojis for display
+# Material information
 MATERIAL_INFO = {
     'glass': {'icon': '🍾', 'tip': 'Recyclable - Glass Bin'},
     'paper': {'icon': '📄', 'tip': 'Recyclable - Paper Bin'},
@@ -82,6 +99,40 @@ MATERIAL_INFO = {
     'trash': {'icon': '🗑️', 'tip': 'Non-Recyclable - General Waste'},
     'unknown': {'icon': '❓', 'tip': 'Cannot identify - Check manually'},
 }
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+# Get script directory
+SCRIPT_DIR = Path(__file__).resolve().parent
+
+# Try to find project root (look for 'models' directory)
+PROJECT_ROOT = SCRIPT_DIR
+if not (SCRIPT_DIR / "models").exists():
+    # Check parent directory
+    if (SCRIPT_DIR.parent / "models").exists():
+        PROJECT_ROOT = SCRIPT_DIR.parent
+    else:
+        # Use current directory
+        PROJECT_ROOT = Path.cwd()
+
+MODELS_DIR = PROJECT_ROOT / "models"
+CAPTURES_DIR = PROJECT_ROOT / "captures"
+
+# Create directories if they don't exist
+MODELS_DIR.mkdir(exist_ok=True)
+CAPTURES_DIR.mkdir(exist_ok=True)
+
+# Model paths
+SVM_MODEL_PATH = MODELS_DIR / "svm_cnn.pkl"
+SVM_SCALER_PATH = MODELS_DIR / "scaler_cnn.pkl"
+KNN_MODEL_PATH = MODELS_DIR / "knn_cnn.pkl"
+KNN_SCALER_PATH = MODELS_DIR / "scaler_knn_cnn.pkl"
+
+# Classification thresholds
+SVM_CONFIDENCE_THRESHOLD = 0.4
+KNN_CONFIDENCE_THRESHOLD = 0.4
 
 
 # ============================================================================
@@ -97,18 +148,25 @@ class RealTimeFeatureExtractor:
         self.input_size = input_size
         print("[INFO] Loading EfficientNetB0 model...")
 
-        # Use fixed input size for faster inference
-        self.model = EfficientNetB0(
-            include_top=False,
-            weights="imagenet",
-            pooling="avg",
-            input_shape=(input_size[0], input_size[1], 3)
-        )
+        try:
+            # Use fixed input size for faster inference
+            self.model = EfficientNetB0(
+                include_top=False,
+                weights="imagenet",
+                pooling="avg",
+                input_shape=(input_size[0], input_size[1], 3)
+            )
 
-        # Warm up the model
-        dummy_input = np.zeros((1, input_size[0], input_size[1], 3), dtype=np.float32)
-        _ = self.model.predict(dummy_input, verbose=0)
-        print("[INFO] Feature extractor ready!")
+            # Warm up the model
+            dummy_input = np.zeros((1, input_size[0], input_size[1], 3), dtype=np.float32)
+            _ = self.model.predict(dummy_input, verbose=0)
+            print("[INFO] Feature extractor ready!")
+
+        except Exception as e:
+            print(f"[ERROR] Failed to load EfficientNetB0: {e}")
+            print("[TIP] Make sure TensorFlow is properly installed:")
+            print("      pip install tensorflow")
+            raise
 
     def extract_from_frame(self, frame):
         """
@@ -120,24 +178,29 @@ class RealTimeFeatureExtractor:
         Returns:
             1280-dimensional normalized feature vector
         """
-        # Resize to fixed input size
-        img = cv2.resize(frame, self.input_size)
+        try:
+            # Resize to fixed input size
+            img = cv2.resize(frame, self.input_size)
 
-        # Convert BGR to RGB
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # Convert BGR to RGB
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # Preprocess for EfficientNet
-        x = preprocess_input(img.astype(np.float32))
-        x = np.expand_dims(x, axis=0)
+            # Preprocess for EfficientNet
+            x = preprocess_input(img.astype(np.float32))
+            x = np.expand_dims(x, axis=0)
 
-        # Extract features
-        features = self.model.predict(x, verbose=0)[0]
+            # Extract features
+            features = self.model.predict(x, verbose=0)[0]
 
-        # Normalize
-        features = features.astype(np.float32)
-        features /= (np.linalg.norm(features) + 1e-6)
+            # Normalize
+            features = features.astype(np.float32)
+            features /= (np.linalg.norm(features) + 1e-6)
 
-        return features
+            return features
+
+        except Exception as e:
+            print(f"[ERROR] Feature extraction failed: {e}")
+            return np.zeros(1280, dtype=np.float32)
 
 
 # ============================================================================
@@ -160,8 +223,17 @@ class MaterialClassifier:
         self.model_type = model_type
 
         if model_type == 'svm':
-            if not SVM_MODEL_PATH.exists() or not SVM_SCALER_PATH.exists():
-                raise FileNotFoundError(f"SVM model not found at {SVM_MODEL_PATH}")
+            if not SVM_MODEL_PATH.exists():
+                raise FileNotFoundError(
+                    f"SVM model not found at {SVM_MODEL_PATH}\n"
+                    f"Please train the model first or place the model files in: {MODELS_DIR}"
+                )
+
+            if not SVM_SCALER_PATH.exists():
+                raise FileNotFoundError(
+                    f"SVM scaler not found at {SVM_SCALER_PATH}\n"
+                    f"Please train the model first or place the scaler file in: {MODELS_DIR}"
+                )
 
             print(f"[INFO] Loading SVM model from {SVM_MODEL_PATH}")
             self.model = joblib.load(SVM_MODEL_PATH)
@@ -170,7 +242,10 @@ class MaterialClassifier:
 
         elif model_type == 'knn':
             if not KNN_MODEL_PATH.exists():
-                raise FileNotFoundError(f"KNN model not found at {KNN_MODEL_PATH}")
+                raise FileNotFoundError(
+                    f"KNN model not found at {KNN_MODEL_PATH}\n"
+                    f"Please train the model first or place the model file in: {MODELS_DIR}"
+                )
 
             print(f"[INFO] Loading KNN model from {KNN_MODEL_PATH}")
             model_data = joblib.load(KNN_MODEL_PATH)
@@ -178,18 +253,25 @@ class MaterialClassifier:
             # Handle both dictionary format and direct classifier format
             if isinstance(model_data, dict):
                 self.model = model_data['knn']
-                self.scaler = model_data['scaler']
+                self.scaler = model_data.get('scaler')
                 self.distance_threshold = model_data.get('distance_threshold', None)
             else:
-                # Model saved directly as classifier - load scaler separately
+                # Model saved directly as classifier
                 self.model = model_data
+                self.scaler = None
+                self.distance_threshold = None
+
+            # Load scaler if not in model dict
+            if self.scaler is None:
                 if KNN_SCALER_PATH.exists():
                     self.scaler = joblib.load(KNN_SCALER_PATH)
-                else:
-                    # Fallback to SVM scaler if KNN scaler not found
+                elif SVM_SCALER_PATH.exists():
                     print("[WARN] KNN scaler not found, using SVM scaler")
                     self.scaler = joblib.load(SVM_SCALER_PATH)
-                self.distance_threshold = None
+                else:
+                    raise FileNotFoundError(
+                        f"No scaler found. Please ensure scaler file exists in: {MODELS_DIR}"
+                    )
 
         print(f"[INFO] {model_type.upper()} model loaded successfully!")
 
@@ -203,13 +285,18 @@ class MaterialClassifier:
         Returns:
             tuple: (class_name, confidence, is_unknown)
         """
-        # Scale features
-        features_scaled = self.scaler.transform([features])
+        try:
+            # Scale features
+            features_scaled = self.scaler.transform([features])
 
-        if self.model_type == 'svm':
-            return self._predict_svm(features_scaled)
-        else:
-            return self._predict_knn(features_scaled)
+            if self.model_type == 'svm':
+                return self._predict_svm(features_scaled)
+            else:
+                return self._predict_knn(features_scaled)
+
+        except Exception as e:
+            print(f"[ERROR] Prediction failed: {e}")
+            return 'unknown', 0.0, True
 
     def _predict_svm(self, features_scaled):
         """SVM prediction with confidence-based unknown rejection."""
@@ -274,11 +361,12 @@ class RealTimeApp:
         print("  Real-Time Deployment")
         print("=" * 50 + "\n")
 
+        print(f"[INFO] Project root: {PROJECT_ROOT}")
+        print(f"[INFO] Models directory: {MODELS_DIR}")
+        print(f"[INFO] Captures directory: {CAPTURES_DIR}\n")
+
         self.extractor = RealTimeFeatureExtractor()
         self.classifier = MaterialClassifier(model_type)
-
-        # Create captures directory
-        CAPTURES_DIR.mkdir(exist_ok=True)
 
     def smooth_prediction(self, prediction, confidence):
         """
@@ -330,7 +418,7 @@ class RealTimeApp:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
 
         # Draw model type and FPS
-        model_info = f"Model: {self.classifier.model_type.upper()} | FPS: {self.fps:.1f} | Inference: {self.inference_time*1000:.0f}ms"
+        model_info = f"Model: {self.classifier.model_type.upper()} | FPS: {self.fps:.1f} | Inference: {self.inference_time * 1000:.0f}ms"
         cv2.putText(frame, model_info, (20, 65),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (180, 180, 180), 1)
 
@@ -414,8 +502,9 @@ class RealTimeApp:
         cap = cv2.VideoCapture(self.camera_id)
 
         if not cap.isOpened():
-            print("[ERROR] Could not open camera!")
+            print(f"[ERROR] Could not open camera {self.camera_id}!")
             print("[TIP] Try different camera IDs (0, 1, 2) or check camera connection.")
+            print("[TIP] Use --camera flag to specify different camera: python deploy.py --camera 1")
             return
 
         # Set camera properties for better performance
@@ -516,11 +605,14 @@ Examples:
   python deploy.py                    # Run with SVM model (default)
   python deploy.py --model knn        # Run with KNN model
   python deploy.py --camera 1         # Use camera index 1
-  
+
 Controls during runtime:
   Q or ESC  - Quit
   S         - Switch between SVM/KNN models
   SPACE     - Capture current frame
+
+Required packages:
+  pip install opencv-python tensorflow numpy joblib scikit-learn
         """
     )
 
@@ -546,9 +638,13 @@ Controls during runtime:
         app.run()
     except FileNotFoundError as e:
         print(f"\n[ERROR] {e}")
-        print("\n[TIP] Make sure to train the models first:")
-        print("  python svmwithcnn.py  # Train SVM model")
-        print("  python knn_cnn.py     # Train KNN model")
+        print("\n[TIP] Make sure to train the models first or place model files in:")
+        print(f"      {MODELS_DIR}")
+        print("\nRequired files:")
+        print("  - svm_cnn.pkl (SVM model)")
+        print("  - scaler_cnn.pkl (SVM scaler)")
+        print("  - knn_cnn.pkl (KNN model)")
+        print("  - scaler_knn_cnn.pkl (KNN scaler)")
         sys.exit(1)
     except Exception as e:
         print(f"\n[ERROR] An unexpected error occurred: {e}")
