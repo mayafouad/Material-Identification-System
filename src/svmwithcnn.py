@@ -1,8 +1,6 @@
-import os
 import joblib
 import numpy as np
 from pathlib import Path
-from tqdm import tqdm
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
@@ -13,9 +11,9 @@ from sklearn.metrics import (
     confusion_matrix
 )
 
-from cnn_feature_extractor import CNNFeatureExtractor
+from src.cnn_feature_extractor import CNNFeatureExtractor
 from data_augmentation import DataAugmentor
-from utils import CLASSES, load_image, load_dataset
+from src.utils import CLASSES, load_dataset
 
 
 # ---------------------------

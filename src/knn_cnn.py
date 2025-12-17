@@ -1,9 +1,7 @@
 import joblib
 import numpy as np
-import pickle
 from pathlib import Path
 from sklearn.neighbors import KNeighborsClassifier
-from tqdm import tqdm
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
@@ -11,9 +9,9 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix
 )
-from cnn_feature_extractor import CNNFeatureExtractor
+from src.cnn_feature_extractor import CNNFeatureExtractor
 from data_augmentation import DataAugmentor
-from utils import CLASSES, load_image, load_dataset
+from src.utils import CLASSES, load_dataset
 
 
 DATASET_DIR = Path(__file__).resolve().parents[1] / "dataset"

@@ -4,9 +4,8 @@ import albumentations as A
 import cv2
 import numpy as np
 from tqdm import tqdm
-from tensorflow.keras.applications.efficientnet import preprocess_input
 
-from utils import CLASSES, load_image
+from src.utils import CLASSES, load_image
 
 
 class DataAugmentor:

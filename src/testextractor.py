@@ -11,7 +11,7 @@ def test_all_dataset():
 
     extractor = FeatureExtractor(img_size=(512, 384), use_hog=True, use_lbp=True, use_hist=True, use_haralick=False)
 
-    dataset_path = "../dataset"
+    dataset_path = "../s"
     categories = ["cardboard", "glass", "metal", "paper", "plastic", "trash"]
 
     if not os.path.exists(dataset_path):
