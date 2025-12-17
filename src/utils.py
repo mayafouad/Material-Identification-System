@@ -65,4 +65,13 @@ def load_dataset(dataset_dir, extractor):
             except Exception as e:
                 print(f"[WARN] Failed to process {img_path}: {e}")
 
+                # delete corrupted image
+                try:
+                    img_path.unlink()  # remove file
+                    print(f"[INFO] Deleted corrupted image: {img_path}")
+                except Exception as del_err:
+                    print(f"[ERROR] Could not delete {img_path}: {del_err}")
+
+
+
     return np.array(X), np.array(y), paths

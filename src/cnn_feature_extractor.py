@@ -42,3 +42,25 @@ class CNNFeatureExtractor:
         features /= (np.linalg.norm(features) + 1e-6)
 
         return features
+
+    def extract_batch(self, imgs):
+        """
+        Extract features from a batch of images efficiently.
+
+        Args:
+            imgs: numpy array of shape (batch_size, H, W, 3), RGB, dtype=float32
+
+        Returns:
+            Normalized features of shape (batch_size, 1280)
+        """
+        # Preprocess batch
+        imgs = preprocess_input(imgs.astype(np.float32))
+
+        # EfficientNet predicts features for the whole batch at once
+        features = self.model.predict(imgs, verbose=0)
+
+        # Normalize each feature vector individually
+        norms = np.linalg.norm(features, axis=1, keepdims=True) + 1e-6
+        features = features / norms
+
+        return features.astype(np.float32)
