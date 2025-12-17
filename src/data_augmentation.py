@@ -16,7 +16,7 @@ class DataAugmentor:
         self.increase_percent = increase_percent
         self.transform = self._create_transform()
 
-    def _create_transform(self):
+    def _create_transform(self, output_size=(224, 224)):
         return A.Compose([
             A.HorizontalFlip(p=0.5),  # Mirror horizontally
             A.VerticalFlip(p=0.3),  # Mirror vertically
@@ -47,6 +47,7 @@ class DataAugmentor:
                 rotate_limit=15,
                 p=0.5
             ),  # Combined shift, scale, rotate (general robustness)
+            A.Resize(height=output_size[0], width=output_size[1]),  # Ensure consistent output size
         ])
 
     def augment_image(self, image):
