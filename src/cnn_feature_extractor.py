@@ -15,13 +15,21 @@ class CNNFeatureExtractor:
             pooling="avg"   # ALWAYS gives 1280-dim vector
         )
 
-    def extract(self, path):
-        img = cv2.imread(path)
-        if img is None:
-            raise ValueError(f"Could not load image: {path}")
-
-        # DO NOT resize
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    def extract(self, img_input):
+        """
+        Args:
+            img_input: Either a file path (str) or an RGB numpy array
+            
+        Returns:
+            Normalized 1280-dim feature vector
+        """
+        if isinstance(img_input, str):
+            img = cv2.imread(img_input)
+            if img is None:
+                raise ValueError(f"Could not load image: {img_input}")
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        else:
+            img = img_input  # Already an RGB array
 
         x = preprocess_input(img.astype(np.float32))
         x = np.expand_dims(x, axis=0)
