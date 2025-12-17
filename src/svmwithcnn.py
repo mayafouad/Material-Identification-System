@@ -14,46 +14,21 @@ from sklearn.metrics import (
 )
 
 from cnn_feature_extractor import CNNFeatureExtractor
-from utils import CLASSES
+from data_augmentation import DataAugmentor
+from utils import CLASSES, load_image, load_dataset
 
 
 # ---------------------------
 # 🔥 FIXED DATASET DIRECTORY
 # ---------------------------
-# This points to: Material-Identification-System/augmented_dataset
-DATASET_DIR = Path(__file__).resolve().parents[1] / "augmented_dataset"
+# Use ORIGINAL dataset (augmentation applied to training set only after split)
+DATASET_DIR = Path(__file__).resolve().parents[1] / "dataset"
 MODEL_PATH = Path(__file__).resolve().parents[1] / "models/svm_cnn.pkl"
 SCALER_PATH = Path(__file__).resolve().parents[1] / "models/scaler_cnn.pkl"
 
+data_augmentor = DataAugmentor()
 
-def load_dataset(dataset_dir, extractor):
-    X, y = [], []
-
-    print(f"\n[INFO] Loading dataset from: {dataset_dir}")
-    print(f"Exists? {dataset_dir.exists()}")
-
-    for label, class_name in enumerate(CLASSES):
-        class_dir = dataset_dir / class_name.lower()  # ensure lowercase compatibility
-        if not class_dir.exists():
-            print(f"[WARN] Missing folder: {class_dir} — skipping this class.")
-            continue
-
-        image_paths = list(class_dir.glob("*.jpg")) + list(class_dir.glob("*.png"))
-
-        print(f"[INFO] Loading {class_name} ({len(image_paths)} images)")
-
-        for img_path in tqdm(image_paths):
-            try:
-                feat = extractor.extract(str(img_path))
-                X.append(feat)
-                y.append(label)
-            except Exception as e:
-                print(f"[WARN] Failed to process {img_path}: {e}")
-
-    return np.array(X), np.array(y)
-
-
-def train_svm_cnn():
+def train_svm_cnn(increase_percent=40):
     print("\n===================================")
     print("     TRAINING SVM + CNN FEATURES   ")
     print("===================================\n")
@@ -61,7 +36,7 @@ def train_svm_cnn():
     extractor = CNNFeatureExtractor()
 
     print("[STEP] Loading CNN features from dataset...")
-    X, y = load_dataset(DATASET_DIR, extractor)
+    X, y, paths = load_dataset(DATASET_DIR, extractor)
 
     print(f"\n[INFO] Loaded feature matrix: {X.shape}")
     if X.shape[0] == 0:
@@ -69,11 +44,20 @@ def train_svm_cnn():
         return
 
     print("\n[STEP] Train/Test split...")
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+    X_train, X_test, y_train, y_test, paths_train, paths_test = train_test_split(
+        X, y, paths, test_size=0.2, random_state=42, stratify=y
     )
+    print(f"       Train: {len(X_train)} | Test: {len(X_test)}")
 
-    print("[STEP] Scaling features...")
+    # Augment training data only
+    X_aug, y_aug = data_augmentor.augment_training_data(paths_train, y_train, extractor, increase_percent)
+    
+    # Combine original + augmented training data
+    X_train = np.vstack([X_train, X_aug])
+    y_train = np.concatenate([y_train, y_aug])
+    print(f"\n[INFO] After augmentation - Train: {len(X_train)} | Test: {len(X_test)}")
+
+    print("\n[STEP] Scaling features...")
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
@@ -92,7 +76,7 @@ def train_svm_cnn():
     y_pred = svm.predict(X_test)
     acc = accuracy_score(y_test, y_pred)
 
-    print(f"\n⭐ Accuracy: {acc:.4f}")
+    print(f"\nAccuracy: {acc:.4f}")
     print("\nClassification Report:")
     print(classification_report(y_test, y_pred, target_names=CLASSES))
 
@@ -134,4 +118,4 @@ def predict_material(image_path):
 
 
 if __name__ == "__main__":
-    train_svm_cnn()
+    train_svm_cnn(increase_percent=40)
