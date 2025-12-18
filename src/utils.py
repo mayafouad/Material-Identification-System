@@ -2,21 +2,12 @@ import cv2
 import numpy as np
 from pathlib import Path
 
-# =========================
-# Class definitions
-# =========================
 CLASSES = ['glass', 'paper', 'cardboard', 'plastic', 'metal', 'trash']
 CLASS_TO_IDX = {cls: idx for idx, cls in enumerate(CLASSES)}
 IDX_TO_CLASS = {idx: cls for idx, cls in enumerate(CLASSES)}
 
 
-# =========================
-# Dataset utilities
-# =========================
 def get_class_counts(dataset_dir):
-    """
-    Count number of images per class.
-    """
     dataset_dir = Path(dataset_dir)
     counts = {}
 
@@ -31,16 +22,6 @@ def get_class_counts(dataset_dir):
 
 
 def load_image(image_path, color_mode="rgb"):
-    """
-    Load a single image from disk.
-
-    Args:
-        image_path: Path or str
-        color_mode: "rgb" or "gray"
-
-    Returns:
-        np.ndarray or None
-    """
     img = cv2.imread(str(image_path))
 
     if img is None:
@@ -56,18 +37,6 @@ def load_image(image_path, color_mode="rgb"):
 
 
 def load_dataset_paths(dataset_dir):
-    """
-    Load dataset as image paths + labels ONLY.
-
-    This function does NOT:
-    - extract CNN features
-    - apply augmentation
-    - touch training logic
-
-    Returns:
-        paths: np.ndarray of Path
-        labels: np.ndarray of int
-    """
     dataset_dir = Path(dataset_dir)
 
     if not dataset_dir.exists():
