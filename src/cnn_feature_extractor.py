@@ -1,5 +1,5 @@
-import cv2
 import numpy as np
+import cv2
 from tensorflow.keras.applications.efficientnet import (
     EfficientNetB0,
     preprocess_input
@@ -7,59 +7,80 @@ from tensorflow.keras.applications.efficientnet import (
 
 
 class CNNFeatureExtractor:
-    def __init__(self):
-        # EfficientNetB0 supports ANY input shape
+    """
+    EfficientNetB0-based feature extractor.
+    Outputs a normalized 1280-dim feature vector per image.
+    """
+
+    def __init__(self, input_size=(224, 224)):
+        self.input_size = input_size
+
         self.model = EfficientNetB0(
             include_top=False,
             weights="imagenet",
-            pooling="avg"   # ALWAYS gives 1280-dim vector
+            pooling="avg"   # always 1280 features
         )
 
-    def extract(self, img_input):
+    # -------------------------
+    # Internal helpers
+    # -------------------------
+    def _prepare_image(self, img: np.ndarray) -> np.ndarray:
         """
+        Resize + preprocess a single RGB image.
+        """
+        if img is None:
+            raise ValueError("Input image is None")
+
+        if img.ndim != 3 or img.shape[2] != 3:
+            raise ValueError(f"Expected RGB image, got shape {img.shape}")
+
+        img = cv2.resize(img, self.input_size, interpolation=cv2.INTER_AREA)
+        img = img.astype(np.float32)
+        img = preprocess_input(img)
+
+        return img
+
+    # -------------------------
+    # Public API
+    # -------------------------
+    def extract(self, img: np.ndarray) -> np.ndarray:
+        """
+        Extract features from a single RGB image.
+
         Args:
-            img_input: Either a file path (str) or an RGB numpy array
-            
+            img: RGB image as numpy array (H, W, 3)
+
         Returns:
-            Normalized 1280-dim feature vector
+            (1280,) normalized feature vector
         """
-        if isinstance(img_input, str):
-            img = cv2.imread(img_input)
-            if img is None:
-                raise ValueError(f"Could not load image: {img_input}")
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        else:
-            img = img_input  # Already an RGB array
+        img = self._prepare_image(img)
+        img = np.expand_dims(img, axis=0)
 
-        x = preprocess_input(img.astype(np.float32))
-        x = np.expand_dims(x, axis=0)
+        features = self.model.predict(img, verbose=0)[0]
 
-        # EfficientNet handles variable shapes smoothly
-        features = self.model.predict(x, verbose=0)[0]
-
-        # Normalize
+        # L2 normalization
         features = features.astype(np.float32)
         features /= (np.linalg.norm(features) + 1e-6)
 
         return features
 
-    def extract_batch(self, imgs):
+    def extract_batch(self, imgs: np.ndarray) -> np.ndarray:
         """
-        Extract features from a batch of images efficiently.
+        Extract features from a batch of RGB images.
 
         Args:
-            imgs: numpy array of shape (batch_size, H, W, 3), RGB, dtype=float32
+            imgs: numpy array (N, H, W, 3)
 
         Returns:
-            Normalized features of shape (batch_size, 1280)
+            (N, 1280) normalized feature matrix
         """
-        # Preprocess batch
-        imgs = preprocess_input(imgs.astype(np.float32))
+        if len(imgs) == 0:
+            raise ValueError("Empty image batch")
 
-        # EfficientNet predicts features for the whole batch at once
+        imgs = np.stack([self._prepare_image(img) for img in imgs])
+
         features = self.model.predict(imgs, verbose=0)
 
-        # Normalize each feature vector individually
         norms = np.linalg.norm(features, axis=1, keepdims=True) + 1e-6
         features = features / norms
 
