@@ -107,12 +107,21 @@ def train_svm_cnn(
     )
     svm.fit(X_train, y_train)
 
-    print("\n[FINAL TEST RESULTS]")
+    train_preds = svm.predict(X_train)
+    train_acc = accuracy_score(y_train, train_preds)
+
+    print("\n[TRAINING RESULTS]")
+    print("Train Accuracy:", train_acc)
+
     test_preds = svm.predict(X_test)
-    print("Test Accuracy:", accuracy_score(y_test, test_preds))
+    test_acc = accuracy_score(y_test, test_preds)
+
+    print("\n[FINAL TEST RESULTS]")
+    print("Test Accuracy:", test_acc)
     print(classification_report(y_test, test_preds, target_names=CLASSES))
     print("Confusion Matrix:")
     print(confusion_matrix(y_test, test_preds))
+
 
     joblib.dump(svm, MODEL_PATH)
     joblib.dump(scaler, SCALER_PATH)
