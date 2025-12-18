@@ -2,10 +2,9 @@ import numpy as np
 from pathlib import Path
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from tqdm import tqdm
-from knn_cnn import predict_material as knn_predict, load_dataset, preprocess_image
-from svmwithcnn import predict_material as svm_predict
-from cnn_feature_extractor import CNNFeatureExtractor
-from utils import CLASSES
+from knn_cnn import load_dataset
+from src.cnn_feature_extractor import CNNFeatureExtractor
+from src.utils import CLASSES
 import joblib
 
 DATASET_DIR = Path(r"C:\Users\ahmed\Downloads\test")
