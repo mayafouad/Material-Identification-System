@@ -66,12 +66,12 @@ MODELS_DIR.mkdir(exist_ok=True)
 CAPTURES_DIR.mkdir(exist_ok=True)
 
 SVM_MODEL_PATH = MODELS_DIR / "svm_cnn.pkl"
-SVM_SCALER_PATH = MODELS_DIR / "scaler_cnn.pkl"
+SVM_SCALER_PATH = MODELS_DIR / "scaler_svm_cnn.pkl"
 KNN_MODEL_PATH = MODELS_DIR / "knn_cnn.pkl"
 KNN_SCALER_PATH = MODELS_DIR / "scaler_knn_cnn.pkl"
 
-SVM_CONFIDENCE_THRESHOLD = 0.4
-KNN_CONFIDENCE_THRESHOLD = 0.4
+SVM_CONFIDENCE_THRESHOLD = 0.55
+KNN_CONFIDENCE_THRESHOLD = 0.6
 
 
 class RealTimeFeatureExtractor:

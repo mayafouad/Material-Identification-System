@@ -48,10 +48,15 @@ def train_knn_cnn(k=5):
     knn = KNeighborsClassifier(
         n_neighbors=k,
         metric="euclidean",
-        weights="distance"
+        weights = "uniform"
     )
 
     knn.fit(X_train, y_train)
+
+    print("\n[TRAIN RESULTS]")
+    train_preds = knn.predict(X_train)
+    train_acc = accuracy_score(y_train, train_preds)
+    print(f"Train Accuracy: {train_acc:.4f}")
 
     print("\n[VALIDATION RESULTS]")
     val_preds = knn.predict(X_val)
@@ -76,4 +81,4 @@ def train_knn_cnn(k=5):
 
 
 if __name__ == "__main__":
-    train_knn_cnn(k=5)
+    train_knn_cnn(k=3)

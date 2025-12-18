@@ -4,9 +4,9 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 from cnn_feature_extractor import CNNFeatureExtractor
-from utils import CLASSES, CLASS_TO_IDX, IDX_TO_CLASS
+from utils import CLASSES, IDX_TO_CLASS ,load_image
 
-UNKNOWN_THRESHOLD = 0.4
+UNKNOWN_THRESHOLD = 0.6
 def predict(dataFilePath, bestModelPath):
     
     print(f"Loading model from: {bestModelPath}")
@@ -20,9 +20,9 @@ def predict(dataFilePath, bestModelPath):
     if 'knn' in model_name.lower():
         scaler_path = model_dir / 'scaler_knn_cnn.pkl'
     elif 'svm' in model_name.lower():
-        scaler_path = model_dir / 'scaler_cnn.pkl'
+        scaler_path = model_dir / 'scaler_svm_cnn.pkl'
     else:
-        scaler_path = model_dir / 'scaler_cnn.pkl'
+        scaler_path = model_dir / 'scaler_svm_cnn.pkl'
         if not scaler_path.exists():
             scaler_path = model_dir / 'scaler_knn_cnn.pkl'
 
@@ -64,7 +64,8 @@ def predict(dataFilePath, bestModelPath):
             print(f"Processing image {i+1}/{len(image_files)}: {img_path.name}")
 
         try:
-            features = extractor.extract(str(img_path))
+            img = load_image(str(img_path))
+            features = extractor.extract(img)
             features_list.append(features)
             valid_indices.append(i)
         except Exception as e:
@@ -91,6 +92,11 @@ def predict(dataFilePath, bestModelPath):
         probs = classifier.predict_proba(features_2d)[0]
         best_idx = np.argmax(probs)
         best_prob = probs[best_idx]
+
+        original_idx = valid_indices[idx]
+        img_name = image_files[original_idx].name
+
+        print(f"Image {idx+1}/{len(image_files)}: {img_name} : Best class={IDX_TO_CLASS[best_idx]}, Probability={best_prob:.4f}")
 
         if best_prob < UNKNOWN_THRESHOLD:
             pred_class = 6  # Unknown

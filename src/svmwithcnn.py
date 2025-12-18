@@ -12,7 +12,7 @@ MODEL_DIR = BASE_DIR / "models"
 
 FEATURES_PATH = DATA_DIR / "features.npz"
 MODEL_PATH = MODEL_DIR / "svm_cnn.pkl"
-SCALER_PATH = MODEL_DIR / "scaler_cnn.pkl"
+SCALER_PATH = MODEL_DIR / "scaler_svm_cnn.pkl"
 
 MODEL_DIR.mkdir(exist_ok=True)
 
@@ -42,7 +42,7 @@ def train_svm():
 
     svm = SVC(
         kernel="rbf",
-        C=10,
+        C=1,
         gamma="scale",
         probability=True
     )
