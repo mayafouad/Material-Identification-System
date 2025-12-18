@@ -18,9 +18,6 @@ MODEL_DIR.mkdir(exist_ok=True)
 
 
 def train_svm():
-    print("\n==========================================")
-    print(" SVM TRAINING (Using Precomputed Features)")
-    print("==========================================\n")
 
     data = np.load(FEATURES_PATH)
 
@@ -31,9 +28,9 @@ def train_svm():
     X_test  = data["X_test"]
     y_test  = data["y_test"]
 
-    print(f"[INFO] Train: {X_train.shape}")
-    print(f"[INFO] Val  : {X_val.shape}")
-    print(f"[INFO] Test : {X_test.shape}")
+    print(f"Train: {X_train.shape}")
+    print(f"Val  : {X_val.shape}")
+    print(f"Test : {X_test.shape}")
 
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
@@ -47,22 +44,14 @@ def train_svm():
         probability=True
     )
 
-    print("[STEP] Training SVM...")
     svm.fit(X_train, y_train)
-
-    # =========================
-    # Evaluation
-    # =========================
-    print("\n[TRAIN RESULTS]")
     train_preds = svm.predict(X_train)
     print("Train Accuracy:", accuracy_score(y_train, train_preds))
 
-    print("\n[VALIDATION RESULTS]")
     val_preds = svm.predict(X_val)
     print("Val Accuracy:", accuracy_score(y_val, val_preds))
     print(classification_report(y_val, val_preds, target_names=CLASSES))
 
-    print("\n[FINAL TEST RESULTS]")
     test_preds = svm.predict(X_test)
     print("Test Accuracy:", accuracy_score(y_test, test_preds))
     print(classification_report(y_test, test_preds, target_names=CLASSES))
@@ -72,7 +61,7 @@ def train_svm():
     joblib.dump(svm, MODEL_PATH)
     joblib.dump(scaler, SCALER_PATH)
 
-    print("\n✔ Model saved:")
+    print("\nModel saved:")
     print(f"  - {MODEL_PATH}")
     print(f"  - {SCALER_PATH}")
 

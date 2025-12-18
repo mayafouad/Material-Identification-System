@@ -78,9 +78,6 @@ def main(
 ):
     assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6
 
-    print("\n==========================================")
-    print(" PREPROCESS (Train → Val → Test)")
-    print("==========================================\n")
 
     extractor = CNNFeatureExtractor()
     augmentor = DataAugmentor(increase_percent=increase_percent)
@@ -108,26 +105,25 @@ def main(
         random_state=random_state
     )
 
-    print(f"[INFO] Train images: {len(p_train)}")
-    print(f"[INFO] Val images  : {len(p_val)}")
-    print(f"[INFO] Test images : {len(p_test)}")
+    print(f"Train images: {len(p_train)}")
+    print(f"Val images  : {len(p_val)}")
+    print(f"Test images : {len(p_test)}")
 
-    print("\n[STEP] Building TRAIN features (with augmentation)...")
+    print("\nBuilding TRAIN features (with augmentation)...")
     X_train, y_train = build_features(
         p_train, y_train, extractor, augmentor
     )
 
-    print("\n[STEP] Building VAL features (no augmentation)...")
+    print("\nBuilding VAL features (no augmentation)...")
     X_val, y_val = build_features(
         p_val, y_val, extractor, augmentor=None
     )
 
-    print("\n[STEP] Building TEST features (no augmentation)...")
+    print("\nBuilding TEST features (no augmentation)...")
     X_test, y_test = build_features(
         p_test, y_test, extractor, augmentor=None
     )
 
-    # 5️⃣ Save once
     np.savez_compressed(
         FEATURES_PATH,
         X_train=X_train,
@@ -139,8 +135,8 @@ def main(
         class_names=np.array(CLASSES)
     )
 
-    print("\n✔ Preprocessing complete")
-    print(f"✔ Saved to: {FEATURES_PATH}")
+    print("\nPreprocessing complete")
+    print(f"Saved to: {FEATURES_PATH}")
     print(f"  - X_train: {X_train.shape}")
     print(f"  - X_val  : {X_val.shape}")
     print(f"  - X_test : {X_test.shape}")

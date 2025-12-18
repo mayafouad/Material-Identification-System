@@ -21,9 +21,6 @@ MODEL_DIR.mkdir(exist_ok=True)
 
 
 def train_knn_cnn(k=5):
-    print("\n==========================================")
-    print(f" KNN + CNN (Train / Val / Test) | k={k}")
-    print("==========================================\n")
 
     data = np.load(FEATURES_PATH)
 
@@ -34,16 +31,14 @@ def train_knn_cnn(k=5):
     X_test  = data["X_test"]
     y_test  = data["y_test"]
 
-    print(f"[INFO] Train: {X_train.shape}")
-    print(f"[INFO] Val  : {X_val.shape}")
-    print(f"[INFO] Test : {X_test.shape}")
+    print(f"Train: {X_train.shape}")
+    print(f"Val  : {X_val.shape}")
+    print(f"Test : {X_test.shape}")
 
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_val   = scaler.transform(X_val)
     X_test  = scaler.transform(X_test)
-
-    print(f"\n[STEP] Training KNN (k={k})...")
 
     knn = KNeighborsClassifier(
         n_neighbors=k,
@@ -53,18 +48,15 @@ def train_knn_cnn(k=5):
 
     knn.fit(X_train, y_train)
 
-    print("\n[TRAIN RESULTS]")
     train_preds = knn.predict(X_train)
     train_acc = accuracy_score(y_train, train_preds)
     print(f"Train Accuracy: {train_acc:.4f}")
 
-    print("\n[VALIDATION RESULTS]")
     val_preds = knn.predict(X_val)
     val_acc = accuracy_score(y_val, val_preds)
     print(f"Val Accuracy: {val_acc:.4f}")
     print(classification_report(y_val, val_preds, target_names=CLASSES))
 
-    print("\n[FINAL TEST RESULTS]")
     test_preds = knn.predict(X_test)
     test_acc = accuracy_score(y_test, test_preds)
     print(f"Test Accuracy: {test_acc:.4f}")
@@ -75,7 +67,7 @@ def train_knn_cnn(k=5):
     joblib.dump(knn, MODEL_PATH)
     joblib.dump(scaler, SCALER_PATH)
 
-    print("\n✔ Model saved:")
+    print("\nModel saved:")
     print(f"  - {MODEL_PATH}")
     print(f"  - {SCALER_PATH}")
 
