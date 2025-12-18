@@ -13,9 +13,6 @@ from data_augmentation import DataAugmentor
 from utils import CLASSES, load_image, load_dataset_paths
 
 
-# =========================
-# Paths
-# =========================
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATASET_DIR = BASE_DIR / "dataset"
 MODEL_DIR = BASE_DIR / "models"
@@ -26,19 +23,12 @@ SCALER_PATH = MODEL_DIR / "scaler_knn_cnn.pkl"
 MODEL_DIR.mkdir(exist_ok=True)
 
 
-# =========================
-# Feature Builder
-# =========================
 def build_features_from_paths(
     paths,
     labels,
     extractor,
     augmentor=None
 ):
-    """
-    Build CNN features from image paths.
-    Applies proportional augmentation ONLY if augmentor is provided.
-    """
     X, y = [], []
 
     for cls in np.unique(labels):
@@ -50,12 +40,10 @@ def build_features_from_paths(
         if len(imgs) == 0:
             continue
 
-        # -------- Original images --------
         for img in imgs:
             X.append(extractor.extract(img))
             y.append(cls)
 
-        # -------- Augmented images (TRAIN ONLY) --------
         if augmentor is not None:
             num_aug = ceil(len(imgs) * augmentor.increase_percent / 100)
 
@@ -68,9 +56,6 @@ def build_features_from_paths(
     return np.array(X), np.array(y)
 
 
-# =========================
-# Training
-# =========================
 def train_knn_cnn(
     k=5,
     test_ratio=0.2,
@@ -84,17 +69,11 @@ def train_knn_cnn(
     extractor = CNNFeatureExtractor()
     augmentor = DataAugmentor(increase_percent=increase_percent)
 
-    # =================================================
-    # 1️⃣ Load paths ONLY
-    # =================================================
     paths, labels = load_dataset_paths(DATASET_DIR)
 
     if len(paths) == 0:
         raise RuntimeError("No images found in dataset directory")
 
-    # =================================================
-    # 2️⃣ Train / Test split (BEFORE augmentation)
-    # =================================================
     p_train, p_test, y_train, y_test = train_test_split(
         paths,
         labels,
@@ -105,9 +84,6 @@ def train_knn_cnn(
 
     print(f"[INFO] Train: {len(p_train)} | Test: {len(p_test)}")
 
-    # =================================================
-    # 3️⃣ Augment TRAIN only → Extract features
-    # =================================================
     print("[STEP] Building TRAIN features (with augmentation)...")
     X_train, y_train = build_features_from_paths(
         p_train, y_train, extractor, augmentor
@@ -118,16 +94,10 @@ def train_knn_cnn(
         p_test, y_test, extractor, augmentor=None
     )
 
-    # =================================================
-    # 4️⃣ Scale (fit on TRAIN only)
-    # =================================================
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
     X_test = scaler.transform(X_test)
 
-    # =================================================
-    # 5️⃣ Train KNN
-    # =================================================
     print("[STEP] Training KNN...")
     knn = KNeighborsClassifier(
         n_neighbors=k,
@@ -136,19 +106,22 @@ def train_knn_cnn(
     )
     knn.fit(X_train, y_train)
 
-    # =================================================
-    # 6️⃣ Final Test
-    # =================================================
-    print("\n[FINAL TEST RESULTS]")
+    train_preds = knn.predict(X_train)
+    train_acc = accuracy_score(y_train, train_preds)
+
+    print("\n[TRAINING RESULTS]")
+    print("Train Accuracy:", train_acc)
+
     test_preds = knn.predict(X_test)
-    print("Test Accuracy:", accuracy_score(y_test, test_preds))
+    test_acc = accuracy_score(y_test, test_preds)
+
+    print("\n[FINAL TEST RESULTS]")
+    print("Test Accuracy:", test_acc)
     print(classification_report(y_test, test_preds, target_names=CLASSES))
     print("Confusion Matrix:")
     print(confusion_matrix(y_test, test_preds))
 
-    # =================================================
-    # 7️⃣ Save
-    # =================================================
+
     joblib.dump(knn, MODEL_PATH)
     joblib.dump(scaler, SCALER_PATH)
 
@@ -157,9 +130,6 @@ def train_knn_cnn(
     print(f"  - {SCALER_PATH}")
 
 
-# =========================
-# Inference with Unknown Handling
-# =========================
 def predict_material(image_path, unknown_threshold=0.4):
     extractor = CNNFeatureExtractor()
     knn = joblib.load(MODEL_PATH)
