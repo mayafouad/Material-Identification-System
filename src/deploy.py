@@ -8,12 +8,10 @@ from pathlib import Path
 from datetime import datetime
 import joblib
 
-# TensorFlow GPU configuration
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # Suppress TF warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import tensorflow as tf
 
-# Enable GPU memory growth to avoid OOM issues
 try:
     gpus = tf.config.experimental.list_physical_devices('GPU')
     if gpus:
@@ -27,17 +25,10 @@ except Exception as e:
 
 from tensorflow.keras.applications.efficientnet import EfficientNetB0, preprocess_input
 
-# ============================================================================
-# CONSTANTS (Embedded to avoid external dependencies)
-# ============================================================================
-
-# Material classes
 CLASSES = ['glass', 'paper', 'cardboard', 'plastic', 'metal', 'trash']
 
-# Index to class mapping
 IDX_TO_CLASS = {i: cls for i, cls in enumerate(CLASSES)}
 
-# UI Colors (BGR format for OpenCV)
 COLORS = {
     'glass': (255, 191, 0),      # Deep Sky Blue
     'paper': (255, 255, 255),    # White
@@ -48,7 +39,6 @@ COLORS = {
     'unknown': (0, 0, 255),      # Red
 }
 
-# Material information
 MATERIAL_INFO = {
     'glass': {'icon': '🍾', 'tip': 'Recyclable - Glass Bin'},
     'paper': {'icon': '📄', 'tip': 'Recyclable - Paper Bin'},
@@ -60,23 +50,18 @@ MATERIAL_INFO = {
 }
 
 
-# Get script directory
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-# Try to find project root (look for 'models' directory)
 PROJECT_ROOT = SCRIPT_DIR
 if not (SCRIPT_DIR / "models").exists():
-    # Check parent directory
     if (SCRIPT_DIR.parent / "models").exists():
         PROJECT_ROOT = SCRIPT_DIR.parent
     else:
-        # Use current directory
         PROJECT_ROOT = Path.cwd()
 
 MODELS_DIR = PROJECT_ROOT / "models"
 CAPTURES_DIR = PROJECT_ROOT / "captures"
 
-# Create directories if they don't exist
 MODELS_DIR.mkdir(exist_ok=True)
 CAPTURES_DIR.mkdir(exist_ok=True)
 
@@ -91,14 +76,12 @@ KNN_CONFIDENCE_THRESHOLD = 0.4
 
 class RealTimeFeatureExtractor:
 
-    #Uses GPU acceleration when available.
 
     def __init__(self, input_size=(224, 224)):
         self.input_size = input_size
         print("Loading EfficientNetB0 model...")
 
         try:
-            # Use fixed input size for faster inference
             self.model = EfficientNetB0(
                 include_top=False,
                 weights="imagenet",
@@ -106,7 +89,6 @@ class RealTimeFeatureExtractor:
                 input_shape=(input_size[0], input_size[1], 3)
             )
 
-            # Warm up the model
             dummy_input = np.zeros((1, input_size[0], input_size[1], 3), dtype=np.float32)
             _ = self.model.predict(dummy_input, verbose=0)
             print("Feature extractor ready!")
@@ -120,20 +102,15 @@ class RealTimeFeatureExtractor:
     def extract_from_frame(self, frame):
 
         try:
-            # Resize to fixed input size
             img = cv2.resize(frame, self.input_size)
 
-            # Convert BGR to RGB
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            # Preprocess for EfficientNet
             x = preprocess_input(img.astype(np.float32))
             x = np.expand_dims(x, axis=0)
 
-            # Extract features
             features = self.model.predict(x, verbose=0)[0]
 
-            # Normalize
             features = features.astype(np.float32)
             features /= (np.linalg.norm(features) + 1e-6)
 
@@ -144,13 +121,7 @@ class RealTimeFeatureExtractor:
             return np.zeros(1280, dtype=np.float32)
 
 
-# ============================================================================
-# CLASSIFIER WRAPPER
-# ============================================================================
 class MaterialClassifier:
-    """
-    Wrapper class for material classification supporting both SVM and KNN models.
-    """
 
     def __init__(self, model_type='svm'):
         self.model_type = model_type
@@ -190,18 +161,15 @@ class MaterialClassifier:
             print(f"Loading KNN model from {KNN_MODEL_PATH}")
             model_data = joblib.load(KNN_MODEL_PATH)
 
-            # Handle both dictionary format and direct classifier format
             if isinstance(model_data, dict):
                 self.model = model_data['knn']
                 self.scaler = model_data.get('scaler')
                 self.distance_threshold = model_data.get('distance_threshold', None)
             else:
-                # Model saved directly as classifier
                 self.model = model_data
                 self.scaler = None
                 self.distance_threshold = None
 
-            # Load scaler if not in model dict
             if self.scaler is None:
                 if KNN_SCALER_PATH.exists():
                     self.scaler = joblib.load(KNN_SCALER_PATH)
@@ -218,7 +186,6 @@ class MaterialClassifier:
     def predict(self, features):
 
         try:
-            # Scale features
             features_scaled = self.scaler.transform([features])
 
             if self.model_type == 'svm':
@@ -231,7 +198,6 @@ class MaterialClassifier:
             return 'unknown', 0.0, True
 
     def _predict_svm(self, features_scaled):
-        # Get probabilities
         probs = self.model.predict_proba(features_scaled)[0]
         best_idx = np.argmax(probs)
         confidence = probs[best_idx]
@@ -243,7 +209,6 @@ class MaterialClassifier:
         return class_name, confidence, False
 
     def _predict_knn(self, features_scaled):
-        # Get probabilities
         probs = self.model.predict_proba(features_scaled)[0]
         best_idx = np.argmax(probs)
         confidence = probs[best_idx]
@@ -267,16 +232,13 @@ class RealTimeApp:
         self.camera_id = camera_id
         self.running = False
 
-        # Performance tracking
         self.fps = 0
         self.frame_times = []
         self.inference_time = 0
 
-        # Classification smoothing (reduces flickering)
         self.prediction_history = []
         self.history_size = 5
 
-        # Initialize components
         print("\n" + "=" * 50)
         print("  MATERIAL STREAM IDENTIFICATION SYSTEM")
         print("  Real-Time Deployment")
@@ -290,9 +252,6 @@ class RealTimeApp:
         self.classifier = MaterialClassifier(model_type)
 
     def smooth_prediction(self, prediction, confidence):
-        """
-        Averaging prediction in last frames so it doesn't predict flickers (reduce it)
-        """
         self.prediction_history.append((prediction, confidence))
 
         if len(self.prediction_history) > self.history_size:
@@ -436,7 +395,6 @@ class RealTimeApp:
         frame_count = 0
         start_time = time.time()
 
-        # Window setup
         window_name = "Material Identification System"
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(window_name, 960, 720)
