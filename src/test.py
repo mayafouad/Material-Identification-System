@@ -6,7 +6,7 @@ warnings.filterwarnings('ignore')
 from cnn_feature_extractor import CNNFeatureExtractor
 from utils import CLASSES, IDX_TO_CLASS ,load_image
 
-UNKNOWN_THRESHOLD = 0.6
+UNKNOWN_THRESHOLD = 0.5
 def predict(dataFilePath, bestModelPath):
     
     print(f"Loading model from: {bestModelPath}")
