@@ -1,9 +1,8 @@
 import shutil
 from pathlib import Path
-import cv2
 
 from data_augmentation import DataAugmentor
-from utils import CLASSES
+from src.utils import CLASSES
 
 
 def test_augmentor():
