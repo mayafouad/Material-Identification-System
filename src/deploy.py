@@ -1,22 +1,3 @@
-"""
-Material Stream Identification System - Real-Time Deployment (Standalone)
-=========================================================================
-This is a standalone version that can run directly in any Python IDE.
-
-Installation:
-    pip install opencv-python tensorflow numpy joblib scikit-learn
-
-Usage:
-    python deploy.py              # Uses SVM model by default
-    python deploy.py --model knn  # Uses KNN model
-    python deploy.py --model svm  # Uses SVM model
-
-Controls:
-    Q or ESC - Quit the application
-    S - Switch between SVM and KNN models
-    SPACE - Capture and save current frame
-"""
-
 import os
 import sys
 import cv2
@@ -25,28 +6,6 @@ import argparse
 import numpy as np
 from pathlib import Path
 from datetime import datetime
-
-# Check for required packages
-REQUIRED_PACKAGES = {
-    'cv2': 'opencv-python',
-    'tensorflow': 'tensorflow',
-    'joblib': 'joblib',
-    'sklearn': 'scikit-learn'
-}
-
-missing_packages = []
-for module, package in REQUIRED_PACKAGES.items():
-    try:
-        __import__(module)
-    except ImportError:
-        missing_packages.append(package)
-
-if missing_packages:
-    print("[ERROR] Missing required packages. Please install them using:")
-    print(f"pip install {' '.join(missing_packages)}")
-    sys.exit(1)
-
-# Now import after checking
 import joblib
 
 # TensorFlow GPU configuration
@@ -60,9 +19,9 @@ try:
     if gpus:
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
-        print(f"[INFO] GPU detected: {len(gpus)} device(s) available")
+        print(f"GPU detected: {len(gpus)} device(s) available")
     else:
-        print("[INFO] No GPU detected, using CPU")
+        print("No GPU detected, using CPU")
 except Exception as e:
     print(f"[WARN] GPU config error: {e}")
 
@@ -73,7 +32,7 @@ from tensorflow.keras.applications.efficientnet import EfficientNetB0, preproces
 # ============================================================================
 
 # Material classes
-CLASSES = ['cardboard', 'glass', 'metal', 'paper', 'plastic', 'trash']
+CLASSES = ['glass', 'paper', 'cardboard', 'plastic', 'metal', 'trash']
 
 # Index to class mapping
 IDX_TO_CLASS = {i: cls for i, cls in enumerate(CLASSES)}
@@ -100,9 +59,6 @@ MATERIAL_INFO = {
     'unknown': {'icon': '❓', 'tip': 'Cannot identify - Check manually'},
 }
 
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
 
 # Get script directory
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -124,29 +80,22 @@ CAPTURES_DIR = PROJECT_ROOT / "captures"
 MODELS_DIR.mkdir(exist_ok=True)
 CAPTURES_DIR.mkdir(exist_ok=True)
 
-# Model paths
 SVM_MODEL_PATH = MODELS_DIR / "svm_cnn.pkl"
 SVM_SCALER_PATH = MODELS_DIR / "scaler_cnn.pkl"
 KNN_MODEL_PATH = MODELS_DIR / "knn_cnn.pkl"
 KNN_SCALER_PATH = MODELS_DIR / "scaler_knn_cnn.pkl"
 
-# Classification thresholds
 SVM_CONFIDENCE_THRESHOLD = 0.4
 KNN_CONFIDENCE_THRESHOLD = 0.4
 
 
-# ============================================================================
-# FEATURE EXTRACTOR (Optimized for Real-Time)
-# ============================================================================
 class RealTimeFeatureExtractor:
-    """
-    EfficientNetB0-based feature extractor optimized for real-time inference.
-    Uses GPU acceleration when available.
-    """
+
+    #Uses GPU acceleration when available.
 
     def __init__(self, input_size=(224, 224)):
         self.input_size = input_size
-        print("[INFO] Loading EfficientNetB0 model...")
+        print("Loading EfficientNetB0 model...")
 
         try:
             # Use fixed input size for faster inference
@@ -160,7 +109,7 @@ class RealTimeFeatureExtractor:
             # Warm up the model
             dummy_input = np.zeros((1, input_size[0], input_size[1], 3), dtype=np.float32)
             _ = self.model.predict(dummy_input, verbose=0)
-            print("[INFO] Feature extractor ready!")
+            print("Feature extractor ready!")
 
         except Exception as e:
             print(f"[ERROR] Failed to load EfficientNetB0: {e}")
@@ -169,15 +118,7 @@ class RealTimeFeatureExtractor:
             raise
 
     def extract_from_frame(self, frame):
-        """
-        Extract features from a BGR frame (OpenCV format).
 
-        Args:
-            frame: BGR image from OpenCV
-
-        Returns:
-            1280-dimensional normalized feature vector
-        """
         try:
             # Resize to fixed input size
             img = cv2.resize(frame, self.input_size)
@@ -219,7 +160,6 @@ class MaterialClassifier:
         self.load_model(model_type)
 
     def load_model(self, model_type):
-        """Load the specified model type."""
         self.model_type = model_type
 
         if model_type == 'svm':
@@ -235,7 +175,7 @@ class MaterialClassifier:
                     f"Please train the model first or place the scaler file in: {MODELS_DIR}"
                 )
 
-            print(f"[INFO] Loading SVM model from {SVM_MODEL_PATH}")
+            print(f"Loading SVM model from {SVM_MODEL_PATH}")
             self.model = joblib.load(SVM_MODEL_PATH)
             self.scaler = joblib.load(SVM_SCALER_PATH)
             self.distance_threshold = None
@@ -247,7 +187,7 @@ class MaterialClassifier:
                     f"Please train the model first or place the model file in: {MODELS_DIR}"
                 )
 
-            print(f"[INFO] Loading KNN model from {KNN_MODEL_PATH}")
+            print(f"Loading KNN model from {KNN_MODEL_PATH}")
             model_data = joblib.load(KNN_MODEL_PATH)
 
             # Handle both dictionary format and direct classifier format
@@ -273,18 +213,10 @@ class MaterialClassifier:
                         f"No scaler found. Please ensure scaler file exists in: {MODELS_DIR}"
                     )
 
-        print(f"[INFO] {model_type.upper()} model loaded successfully!")
+        print(f"{model_type.upper()} model loaded successfully!")
 
     def predict(self, features):
-        """
-        Predict material class from features.
 
-        Args:
-            features: 1280-dimensional feature vector
-
-        Returns:
-            tuple: (class_name, confidence, is_unknown)
-        """
         try:
             # Scale features
             features_scaled = self.scaler.transform([features])
@@ -299,13 +231,11 @@ class MaterialClassifier:
             return 'unknown', 0.0, True
 
     def _predict_svm(self, features_scaled):
-        """SVM prediction with confidence-based unknown rejection."""
         # Get probabilities
         probs = self.model.predict_proba(features_scaled)[0]
         best_idx = np.argmax(probs)
         confidence = probs[best_idx]
 
-        # Reject as unknown if confidence is low
         if confidence < SVM_CONFIDENCE_THRESHOLD:
             return 'unknown', confidence, True
 
@@ -313,17 +243,14 @@ class MaterialClassifier:
         return class_name, confidence, False
 
     def _predict_knn(self, features_scaled):
-        """KNN prediction with distance-based unknown rejection."""
         # Get probabilities
         probs = self.model.predict_proba(features_scaled)[0]
         best_idx = np.argmax(probs)
         confidence = probs[best_idx]
 
-        # Get distances to nearest neighbors
         distances, _ = self.model.kneighbors(features_scaled)
         mean_distance = np.mean(distances[0])
 
-        # Reject as unknown if low confidence or far from training data
         if confidence < KNN_CONFIDENCE_THRESHOLD:
             return 'unknown', confidence, True
 
@@ -334,13 +261,7 @@ class MaterialClassifier:
         return class_name, confidence, False
 
 
-# ============================================================================
-# REAL-TIME APPLICATION
-# ============================================================================
 class RealTimeApp:
-    """
-    Real-time material classification application with GUI.
-    """
 
     def __init__(self, model_type='svm', camera_id=0):
         self.camera_id = camera_id
@@ -361,40 +282,34 @@ class RealTimeApp:
         print("  Real-Time Deployment")
         print("=" * 50 + "\n")
 
-        print(f"[INFO] Project root: {PROJECT_ROOT}")
-        print(f"[INFO] Models directory: {MODELS_DIR}")
-        print(f"[INFO] Captures directory: {CAPTURES_DIR}\n")
+        print(f"Project root: {PROJECT_ROOT}")
+        print(f"Models directory: {MODELS_DIR}")
+        print(f"Captures directory: {CAPTURES_DIR}\n")
 
         self.extractor = RealTimeFeatureExtractor()
         self.classifier = MaterialClassifier(model_type)
 
     def smooth_prediction(self, prediction, confidence):
         """
-        Smooth predictions over multiple frames to reduce flickering.
-        Uses majority voting with confidence weighting.
+        Averaging prediction in last frames so it doesn't predict flickers (reduce it)
         """
         self.prediction_history.append((prediction, confidence))
 
         if len(self.prediction_history) > self.history_size:
             self.prediction_history.pop(0)
 
-        # Weighted voting
         votes = {}
         for pred, conf in self.prediction_history:
             if pred not in votes:
                 votes[pred] = 0
             votes[pred] += conf
 
-        # Return prediction with highest weighted votes
         best_pred = max(votes.keys(), key=lambda x: votes[x])
         avg_conf = votes[best_pred] / len([p for p, c in self.prediction_history if p == best_pred])
 
         return best_pred, avg_conf
 
     def draw_ui(self, frame, prediction, confidence, is_unknown):
-        """
-        Draw the classification UI overlay on the frame.
-        """
         h, w = frame.shape[:2]
 
         # Create semi-transparent overlay for info panel
@@ -486,19 +401,15 @@ class RealTimeApp:
         return frame
 
     def capture_frame(self, frame, prediction, confidence):
-        """Save the current frame with classification result."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"capture_{prediction}_{confidence:.2f}_{timestamp}.jpg"
         filepath = CAPTURES_DIR / filename
         cv2.imwrite(str(filepath), frame)
-        print(f"[INFO] Frame captured: {filepath}")
+        print(f"Frame captured: {filepath}")
         return filepath
 
     def run(self):
-        """
-        Main application loop.
-        """
-        print("\n[INFO] Starting camera...")
+        print("\nStarting camera...")
         cap = cv2.VideoCapture(self.camera_id)
 
         if not cap.isOpened():
@@ -513,7 +424,7 @@ class RealTimeApp:
         cap.set(cv2.CAP_PROP_FPS, 30)
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce latency
 
-        print("[INFO] Camera initialized successfully!")
+        print("Camera initialized successfully!")
         print("\n" + "-" * 40)
         print("CONTROLS:")
         print("  Q or ESC  - Quit application")
@@ -538,16 +449,13 @@ class RealTimeApp:
                     print("[WARN] Failed to grab frame")
                     continue
 
-                # Measure inference time
                 inference_start = time.time()
 
-                # Extract features and classify
                 features = self.extractor.extract_from_frame(frame)
                 prediction, confidence, is_unknown = self.classifier.predict(features)
 
                 self.inference_time = time.time() - inference_start
 
-                # Smooth predictions
                 prediction, confidence = self.smooth_prediction(prediction, confidence)
 
                 # Calculate FPS
@@ -558,63 +466,39 @@ class RealTimeApp:
                     frame_count = 0
                     start_time = time.time()
 
-                # Draw UI
                 display_frame = self.draw_ui(frame.copy(), prediction, confidence, is_unknown)
-
-                # Show frame
                 cv2.imshow(window_name, display_frame)
 
                 # Handle keyboard input
                 key = cv2.waitKey(1) & 0xFF
-
                 if key == ord('q') or key == 27:  # Q or ESC
-                    print("\n[INFO] Quit requested")
+                    print("\nQuit requested")
                     self.running = False
 
-                elif key == ord('s'):  # Switch model
+                elif key == ord('s'):
                     new_model = 'knn' if self.classifier.model_type == 'svm' else 'svm'
-                    print(f"\n[INFO] Switching to {new_model.upper()} model...")
+                    print(f"\nSwitching to {new_model.upper()} model...")
                     try:
                         self.classifier.load_model(new_model)
                         self.prediction_history.clear()
                     except FileNotFoundError as e:
                         print(f"[ERROR] {e}")
 
-                elif key == ord(' '):  # Space - capture
+                elif key == ord(' '):
                     self.capture_frame(frame, prediction, confidence)
 
         except KeyboardInterrupt:
-            print("\n[INFO] Interrupted by user")
+            print("\nInterrupted by user")
 
         finally:
-            print("[INFO] Cleaning up...")
+            print("Cleaning up...")
             cap.release()
             cv2.destroyAllWindows()
-            print("[INFO] Application closed")
+            print("Application closed")
 
 
-# ============================================================================
-# MAIN ENTRY POINT
-# ============================================================================
 def main():
-    parser = argparse.ArgumentParser(
-        description="Material Stream Identification System - Real-Time Deployment",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  python deploy.py                    # Run with SVM model (default)
-  python deploy.py --model knn        # Run with KNN model
-  python deploy.py --camera 1         # Use camera index 1
-
-Controls during runtime:
-  Q or ESC  - Quit
-  S         - Switch between SVM/KNN models
-  SPACE     - Capture current frame
-
-Required packages:
-  pip install opencv-python tensorflow numpy joblib scikit-learn
-        """
-    )
+    parser = argparse.ArgumentParser()
 
     parser.add_argument(
         '--model', '-m',
