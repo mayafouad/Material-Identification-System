@@ -1,8 +1,8 @@
 from pathlib import Path
-from test import predict  
+from run import predict  
 
 data_folder = Path(__file__).resolve().parents[1]/"testData"
-model_file = Path(__file__).resolve().parents[1] / "models/knn_cnn.pkl"  
+model_file = Path(__file__).resolve().parents[1] / "models/svm_cnn.pkl"  
 
 predictions = predict(data_folder, model_file)
 

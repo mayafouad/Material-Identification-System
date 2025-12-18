@@ -5,9 +5,10 @@ import warnings
 warnings.filterwarnings('ignore')
 from cnn_feature_extractor import CNNFeatureExtractor
 from utils import CLASSES, IDX_TO_CLASS ,load_image
+model_file = Path(__file__).resolve().parents[1] / "models/svm_cnn.pkl"  
 
 UNKNOWN_THRESHOLD = 0.5
-def predict(dataFilePath, bestModelPath):
+def predict(dataFilePath, bestModelPath = model_file):
     
     print(f"Loading model from: {bestModelPath}")
     print(f"Loading images from: {dataFilePath}")
