@@ -1,126 +1,71 @@
 import joblib
 import numpy as np
 from pathlib import Path
-from math import ceil
 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
-from cnn_feature_extractor import CNNFeatureExtractor
-from data_augmentation import DataAugmentor
-from utils import CLASSES, load_image, load_dataset_paths
+from utils import CLASSES
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-DATASET_DIR = BASE_DIR / "dataset"
+DATA_DIR = BASE_DIR / "data"
 MODEL_DIR = BASE_DIR / "models"
 
+FEATURES_PATH = DATA_DIR / "features.npz"
 MODEL_PATH = MODEL_DIR / "knn_cnn.pkl"
 SCALER_PATH = MODEL_DIR / "scaler_knn_cnn.pkl"
 
 MODEL_DIR.mkdir(exist_ok=True)
 
 
-def build_features_from_paths(
-    paths,
-    labels,
-    extractor,
-    augmentor=None
-):
-    X, y = [], []
-
-    for cls in np.unique(labels):
-        cls_paths = paths[labels == cls]
-
-        imgs = [load_image(p) for p in cls_paths]
-        imgs = [img for img in imgs if img is not None]
-
-        if len(imgs) == 0:
-            continue
-
-        for img in imgs:
-            X.append(extractor.extract(img))
-            y.append(cls)
-
-        if augmentor is not None:
-            num_aug = ceil(len(imgs) * augmentor.increase_percent / 100)
-
-            for i in range(num_aug):
-                base_img = imgs[i % len(imgs)]
-                aug_img = augmentor.augment(base_img)
-                X.append(extractor.extract(aug_img))
-                y.append(cls)
-
-    return np.array(X), np.array(y)
-
-
-def train_knn_cnn(
-    k=5,
-    test_ratio=0.2,
-    increase_percent=40,
-    random_state=42
-):
+def train_knn_cnn(k=5):
     print("\n==========================================")
-    print(" KNN + CNN (Train/Test → Augment → Extract)")
+    print(f" KNN + CNN (Train / Val / Test) | k={k}")
     print("==========================================\n")
 
-    extractor = CNNFeatureExtractor()
-    augmentor = DataAugmentor(increase_percent=increase_percent)
+    data = np.load(FEATURES_PATH)
 
-    paths, labels = load_dataset_paths(DATASET_DIR)
+    X_train = data["X_train"]
+    y_train = data["y_train"]
+    X_val   = data["X_val"]
+    y_val   = data["y_val"]
+    X_test  = data["X_test"]
+    y_test  = data["y_test"]
 
-    if len(paths) == 0:
-        raise RuntimeError("No images found in dataset directory")
-
-    p_train, p_test, y_train, y_test = train_test_split(
-        paths,
-        labels,
-        test_size=test_ratio,
-        stratify=labels,
-        random_state=random_state
-    )
-
-    print(f"[INFO] Train: {len(p_train)} | Test: {len(p_test)}")
-
-    print("[STEP] Building TRAIN features (with augmentation)...")
-    X_train, y_train = build_features_from_paths(
-        p_train, y_train, extractor, augmentor
-    )
-
-    print("[STEP] Building TEST features (no augmentation)...")
-    X_test, y_test = build_features_from_paths(
-        p_test, y_test, extractor, augmentor=None
-    )
+    print(f"[INFO] Train: {X_train.shape}")
+    print(f"[INFO] Val  : {X_val.shape}")
+    print(f"[INFO] Test : {X_test.shape}")
 
     scaler = StandardScaler()
     X_train = scaler.fit_transform(X_train)
-    X_test = scaler.transform(X_test)
+    X_val   = scaler.transform(X_val)
+    X_test  = scaler.transform(X_test)
 
-    print("[STEP] Training KNN...")
+    print(f"\n[STEP] Training KNN (k={k})...")
+
     knn = KNeighborsClassifier(
         n_neighbors=k,
         metric="euclidean",
         weights="distance"
     )
+
     knn.fit(X_train, y_train)
 
-    train_preds = knn.predict(X_train)
-    train_acc = accuracy_score(y_train, train_preds)
-
-    print("\n[TRAINING RESULTS]")
-    print("Train Accuracy:", train_acc)
-
-    test_preds = knn.predict(X_test)
-    test_acc = accuracy_score(y_test, test_preds)
+    print("\n[VALIDATION RESULTS]")
+    val_preds = knn.predict(X_val)
+    val_acc = accuracy_score(y_val, val_preds)
+    print(f"Val Accuracy: {val_acc:.4f}")
+    print(classification_report(y_val, val_preds, target_names=CLASSES))
 
     print("\n[FINAL TEST RESULTS]")
-    print("Test Accuracy:", test_acc)
+    test_preds = knn.predict(X_test)
+    test_acc = accuracy_score(y_test, test_preds)
+    print(f"Test Accuracy: {test_acc:.4f}")
     print(classification_report(y_test, test_preds, target_names=CLASSES))
     print("Confusion Matrix:")
     print(confusion_matrix(y_test, test_preds))
-
 
     joblib.dump(knn, MODEL_PATH)
     joblib.dump(scaler, SCALER_PATH)
@@ -130,28 +75,5 @@ def train_knn_cnn(
     print(f"  - {SCALER_PATH}")
 
 
-def predict_material(image_path, unknown_threshold=0.4):
-    extractor = CNNFeatureExtractor()
-    knn = joblib.load(MODEL_PATH)
-    scaler = joblib.load(SCALER_PATH)
-
-    img = load_image(image_path)
-    feat = extractor.extract(img)
-    feat_scaled = scaler.transform([feat])
-
-    probs = knn.predict_proba(feat_scaled)[0]
-    best_idx = np.argmax(probs)
-    best_prob = probs[best_idx]
-
-    if best_prob < unknown_threshold:
-        return "Unknown", float(1 - best_prob)
-
-    return CLASSES[best_idx], float(best_prob)
-
-
 if __name__ == "__main__":
-    train_knn_cnn(
-        k=5,
-        test_ratio=0.2,
-        increase_percent=40
-    )
+    train_knn_cnn(k=5)
