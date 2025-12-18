@@ -277,7 +277,7 @@ if __name__ == "__main__":
         model_path = sys.argv[2]
     else:
         # Default paths - UPDATE THESE
-        test_data_path = "../testimg/"  # Folder containing test images
+        test_data_path = "../testing/"  # Folder containing test images
         model_path = "../models/svm_cnn.pkl"       # Your best model file
 
     # Check if paths exist
