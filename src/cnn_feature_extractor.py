@@ -7,27 +7,15 @@ from tensorflow.keras.applications.efficientnet import (
 
 
 class CNNFeatureExtractor:
-    """
-    EfficientNetB0-based feature extractor.
-    Outputs a normalized 1280-dim feature vector per image.
-    """
-
     def __init__(self, input_size=(224, 224)):
         self.input_size = input_size
 
         self.model = EfficientNetB0(
             include_top=False,
             weights="imagenet",
-            pooling="avg"   # always 1280 features
+            pooling="avg"
         )
-
-    # -------------------------
-    # Internal helpers
-    # -------------------------
     def _prepare_image(self, img: np.ndarray) -> np.ndarray:
-        """
-        Resize + preprocess a single RGB image.
-        """
         if img is None:
             raise ValueError("Input image is None")
 
@@ -40,40 +28,16 @@ class CNNFeatureExtractor:
 
         return img
 
-    # -------------------------
-    # Public API
-    # -------------------------
     def extract(self, img: np.ndarray) -> np.ndarray:
-        """
-        Extract features from a single RGB image.
-
-        Args:
-            img: RGB image as numpy array (H, W, 3)
-
-        Returns:
-            (1280,) normalized feature vector
-        """
         img = self._prepare_image(img)
         img = np.expand_dims(img, axis=0)
-
         features = self.model.predict(img, verbose=0)[0]
-
-        # L2 normalization
         features = features.astype(np.float32)
         features /= (np.linalg.norm(features) + 1e-6)
-
         return features
 
     def extract_batch(self, imgs: np.ndarray) -> np.ndarray:
-        """
-        Extract features from a batch of RGB images.
 
-        Args:
-            imgs: numpy array (N, H, W, 3)
-
-        Returns:
-            (N, 1280) normalized feature matrix
-        """
         if len(imgs) == 0:
             raise ValueError("Empty image batch")
 

@@ -3,12 +3,6 @@ import cv2
 
 
 class DataAugmentor:
-    """
-    Image-only data augmentation.
-    Does NOT touch disk.
-    Does NOT extract features.
-    """
-
     def __init__(self, increase_percent=40, output_size=(224, 224)):
         self.increase_percent = increase_percent
         self.output_size = output_size
