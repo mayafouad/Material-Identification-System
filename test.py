@@ -82,7 +82,7 @@ def predict(dataFilePath, bestModelPath):
         image_files.extend(data_path.glob(f'*{ext}'))
         image_files.extend(data_path.glob(f'*{ext.upper()}'))
 
-    image_files = sorted(set(image_files))
+
     print(f"Found {len(image_files)} images")
 
     if len(image_files) == 0:
